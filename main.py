@@ -9,4 +9,3 @@ class CommuteApp:
         self.api_key = os.environ.get("API_KEY")
         self.client = None
 
-

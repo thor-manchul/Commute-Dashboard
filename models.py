@@ -27,7 +27,6 @@ class TomTomClient:
 
 
 
-
 class Commute:
     def __init__(self, travel_seconds, arrival_iso):
         self.minutes = travel_seconds // 60
