@@ -1,0 +1,8 @@
+# Secrets
+.env
+
+# Python Cache
+__pycache__/
+
+# PyCharm Settings (The folder I see in your image)
+.idea/
