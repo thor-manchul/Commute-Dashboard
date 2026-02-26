@@ -19,7 +19,7 @@ class CommuteApp:
         Initializes the application and loads environment variables.
         """
         load_dotenv()
-        self.api_key = os.environ.get("API_KEY")
+        self.api_key = os.environ.get("TOMTOM_API_KEY")
         self.client = None
 
     def initialize_client(self) -> bool:
@@ -46,7 +46,7 @@ class CommuteApp:
         """
 
         print("\n" + "=" * 30)
-        print("SMART COMMUTE DASHBOARD")
+        print(" 🚗 SMART COMMUTE DASHBOARD")
         print("=" * 30)
 
         while True:
@@ -85,5 +85,67 @@ class CommuteApp:
             print("\n✅ Input validated successfully!")
             return start, end, arrival, mode
 
+    def run(self) -> None:
+        """
+        Main application loop that coordinates the end-to-end commute calculation.
+
+        Handles initialization, user input gathering, geocoding, and routing
+        while managing errors and user exit requests.
+        """
+        if not self.initialize_client():
+            return
+
+        print("\n🌟 Welcome to Smart Commute Dashboard!")
+
+        while True:
+            try:
+                # 1. Gather validated input
+                start, end, arrival, mode = self._get_user_input()
+
+                # 2. Convert addresses to coordinates
+                print("\n🔍 Looking up addresses...")
+                start_coords = self.client.get_coords(start)
+                end_coords = self.client.get_coords(end)
+
+                if not start_coords or not end_coords:
+                    print("❌ Could not find one or both addresses. Please be more specific.")
+                    continue
+
+                # 3. Calculate the route
+                print("🚗 Calculating route...")
+                route_data = self.client.get_route_data(start_coords, end_coords, arrival, mode)
+
+                # 4. Handle API logic errors
+                if not route_data or 'routes' not in route_data:
+                    print("❌ Could not calculate route. Check your parameters or arrival time.")
+                    continue
+
+                # 5. Process and display results
+                travel_seconds = route_data['routes'][0]['summary']['travelTimeInSeconds']
+                commute = Commute(travel_seconds, arrival)
+
+                print("\n" + "=" * 30)
+                print("📊 COMMUTE RESULTS")
+                print("=" * 30)
+                print(commute.display())
+                print("=" * 30)
+
+                # 6. Exit or Continue
+                again = input("\n🔄 Calculate another route? (y/n): ").strip().lower()
+                if again != 'y':
+                    print("\n👋 Thank you for using Smart Commute Dashboard!")
+                    break
+
+            except KeyboardInterrupt:
+                print("\n\n👋 Program terminated by user. Goodbye!")
+                break
+            except Exception as e:
+                # In a cybersecurity context, you might use generic error messages
+                # to avoid information disclosure.
+                print(f"\n❌ An unexpected error occurred. Please try again.")
 
 
+
+if __name__ == "__main__":
+    app = CommuteApp()
+    app.run()

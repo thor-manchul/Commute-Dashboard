@@ -58,7 +58,11 @@ pip install -r requirements.txt
 
 Create a `.env` file in the project root:
 ```env
-API_KEY=your_tomtom_api_key_here
+Copy the template: cp .env.example .env
+
+Open .env and enter your TomTom API key.
+
+TOMTOM_API_KEY=your_tomtom_api_key_here
 ```
 
 > **Security Note**: The `.env` file is git-ignored to protect your API credentials.
