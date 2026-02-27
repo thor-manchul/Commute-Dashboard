@@ -188,7 +188,7 @@ This project is open source and available under the [MIT License](LICENSE).
 
 **Thor Manchul**
 - GitHub: [@thor-manchul](https://github.com/thor-manchul)
-- LinkedIn: [Thor Manchul](https://www.linkedin.com/in/thor-manchul-5857213a6/)
+- LinkedIn: [Thor Manchul](https://www.linkedin.com/in/thor-manchul/)
 
 ---
 
