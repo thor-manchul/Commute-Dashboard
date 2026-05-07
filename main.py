@@ -37,7 +37,7 @@ class CommuteApp:
         return True
 
 
-    def _get_user_input(self) -> tuple[str, str, str, str]:
+    def _get_user_input(self) -> tuple[str, str, str, str] | None:
         """
         Prompts user for details and validates both time format and travel mode.
 

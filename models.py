@@ -33,15 +33,23 @@ class TomTomClient:
             Optional[str]: A 'lat,lon' string if found, otherwise None.
         """
         url = f"{self.search_url}/{address}.json?key={self.api_key}&limit=1"
-        response = requests.get(url).json()
-        if not response.get('results'):
+        try:
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            response_json = response.json()
+        except requests.exceptions.HTTPError as e:
+            print(f"❌ API Error for address '{address}': {e}")
             return None
-        pos = response['results'][0]['position']
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Request failed for address '{address}': {e}")
+            return None
+        if not response_json.get('results'):
+            return None
+        pos = response_json['results'][0]['position']
         return f"{pos['lat']},{pos['lon']}"
 
 
-
-    def get_route_data(self, start_coords: str, end_coords: str, arrival_time: str, mode: str) -> Dict[str, Any]:
+    def get_route_data(self, start_coords: str, end_coords: str, arrival_time: str, mode: str) -> Dict[str, Any] | None:
         """
         Retrieves routing data including travel time and traffic information.
 
@@ -52,7 +60,7 @@ class TomTomClient:
             mode (str): Mode of transport (e.g., 'car', 'pedestrian', 'bicycle').
 
         Returns:
-            Dict[str, Any]: The raw JSON response from the TomTom Routing API.
+            Dict[str, Any]: The raw JSON response from the TomTom Routing API, or None on error.
         """
         params = {
             "key": self.api_key,
@@ -61,8 +69,16 @@ class TomTomClient:
             "travelMode": mode
         }
         url = f"{self.routing_url}/{start_coords}:{end_coords}/json"
-        return requests.get(url, params=params).json()
-
+        try:
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.HTTPError as e:
+            print(f"❌ API Error for route: {e}")
+            return None
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Request failed: {e}")
+            return None
 
 
 class Commute:
