@@ -1,6 +1,6 @@
 import requests
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 
 
 class TomTomClient:
@@ -22,7 +22,7 @@ class TomTomClient:
         self.routing_url = "https://api.tomtom.com/routing/1/calculateRoute"
 
 
-    def get_coords(self, address: str) -> Optional[str]:
+    def get_coords(self, address: str) -> str | None:
         """
         Converts a physical address string into geographic coordinates (latitude and longitude).
 
@@ -30,7 +30,7 @@ class TomTomClient:
             address (str): The address or landmark to locate.
 
         Returns:
-            Optional[str]: A 'lat,lon' string if found, otherwise None.
+            str | None: A 'lat,lon' string if found, otherwise None.
         """
         url = f"{self.search_url}/{address}.json?key={self.api_key}&limit=1"
         try:
@@ -111,3 +111,66 @@ class Commute:
             str: A string containing the travel duration and recommended departure time.
         """
         return f"⏰ {self.minutes} mins | 🚀 Leave by: {self.leave_dt.strftime('%I:%M %p')}"
+
+
+
+
+class TelegramClient:
+    """
+    Service class that handles sending messages via the Telegram Bot API.
+    """
+
+    def __init__(self, bot_token: str):
+        """
+        Initializes the Telegram client.
+        Args:
+            bot_token (str): The HTTP API token provided by BotFather.
+        """
+        self.bot_token = bot_token
+        self.base_url = f"https://api.telegram.org/bot{self.bot_token}"
+
+    def send_message(self, chat_id: str, text: str) -> bool:
+        """
+        Sends a text message to a specific Telegram Chat ID.
+
+        Args:
+            chat_id (str): The destination user's Chat ID.
+            text (str): The message payload.
+
+        Returns:
+            bool: True if successful, False otherwise.
+        """
+        url = f"{self.base_url}/sendMessage"
+        payload = {
+            "chat_id": chat_id,
+            "text": text
+        }
+        try:
+            response = requests.post(url, json=payload, timeout=10)
+            response.raise_for_status()
+            return True
+        except requests.exceptions.HTTPError as e:
+            print(f"\n❌ Telegram API Error: {e}")
+            return False
+        except requests.exceptions.RequestException as e:
+            print(f"\n❌ Telegram Network Error: {e}")
+            return False
+
+
+    def validate_chat_id(self, chat_id: str) -> bool:
+        """
+            Validates that a chat ID is reachable by the bot before scheduling an alert.
+
+            Args:
+                chat_id (str): The Chat ID to validate.
+
+            Returns:
+                bool: True if the chat ID is reachable, False otherwise.
+        """
+        url = f"{self.base_url}/getChat"
+        try:
+            response = requests.get(url, params={"chat_id": chat_id}, timeout=10)
+            response.raise_for_status()
+            return response.json().get("ok", False)
+        except requests.exceptions.RequestException:
+            return False

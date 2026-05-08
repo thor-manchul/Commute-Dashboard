@@ -1,7 +1,9 @@
 import os
 from dotenv import load_dotenv
-from models import TomTomClient, Commute
-from datetime import datetime
+from models import TomTomClient, Commute, TelegramClient
+from datetime import datetime, timedelta
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.date import DateTrigger
 
 class CommuteApp:
     """
@@ -13,6 +15,7 @@ class CommuteApp:
 
     VALID_MODES = ["car", "bicycle", "pedestrian"]
     DEFAULT_MODE = "car"
+    TELEGRAM_LINK = "t.me/CommuteAlertBot"
 
     def __init__(self):
         """
@@ -20,7 +23,12 @@ class CommuteApp:
         """
         load_dotenv()
         self.api_key = os.environ.get("TOMTOM_API_KEY")
+        self.telegram_token = os.environ.get("TELEGRAM_BOT_TOKEN")
         self.client = None
+        self.telegram_client = None
+
+        self.scheduler = BackgroundScheduler()
+        self.scheduler.start()
 
     def initialize_client(self) -> bool:
         """
@@ -34,6 +42,11 @@ class CommuteApp:
             print("Error: API key not provided in .env file")
             return False
         self.client = TomTomClient(self.api_key)
+        if self.telegram_token:
+            self.telegram_client = TelegramClient(self.telegram_token)
+        else:
+            print("⚠️ Warning: TELEGRAM_BOT_TOKEN not found. Notifications disabled.")
+
         return True
 
 
@@ -85,6 +98,32 @@ class CommuteApp:
             print("\n✅ Input validated successfully!")
             return start, end, arrival, mode
 
+    def _get_chat_id(self) -> str:
+        """
+        Separately prompts the user for their Telegram Chat ID for notifications.
+        Validates the chat ID against the Telegram API before accepting it.
+
+        Returns:
+            str: A validated chat ID, or an empty string if the user skips.
+        """
+        if not self.telegram_client:
+            return ""
+
+        print(f"\n📱 Want a 5-minute warning? Message {self.TELEGRAM_LINK} with 'START' to get your ID.")
+
+        while True:
+            chat_id = input("💬 Enter Chat ID (or press Enter to skip): ").strip()
+
+            if not chat_id:
+                return ""
+
+            print("🔍 Validating Chat ID...")
+            if self.telegram_client.validate_chat_id(chat_id):
+                print("✅ Chat ID confirmed!")
+                return chat_id
+            else:
+                print("❌ Could not reach that Chat ID. Check it and try again, or press Enter to skip.")
+
     def run(self) -> None:
         """
         Main application loop that coordinates the end-to-end commute calculation.
@@ -101,6 +140,7 @@ class CommuteApp:
             try:
                 # 1. Gather validated input
                 start, end, arrival, mode = self._get_user_input()
+                chat_id = self._get_chat_id()
 
                 # 2. Convert addresses to coordinates
                 print("\n🔍 Looking up addresses...")
@@ -130,18 +170,42 @@ class CommuteApp:
                 print(commute.display())
                 print("=" * 30)
 
+                if chat_id and self.telegram_client:
+                    notify_time = commute.leave_dt - timedelta(minutes=5)
+                    if notify_time > datetime.now():
+                        # Standard flow: Plenty of time, schedule the 5-minute warning
+                        msg = f"🚗 SMART COMMUTE ALERT 🚗\nYou need to leave for {end} in 5 minutes to arrive on time!"
+                        self.scheduler.add_job(
+                            self.telegram_client.send_message,
+                            trigger=DateTrigger(run_date=notify_time),
+                            args=[chat_id, msg]
+                        )
+                        print(f"✅ Telegram alert scheduled for {notify_time.strftime('%I:%M %p')}!")
+
+                    elif commute.leave_dt > datetime.now():
+                        # Edge case: They need to leave in LESS than 5 minutes
+                        minutes_left = int((commute.leave_dt - datetime.now()).total_seconds() / 60)
+                        print(f"🚨 URGENT: You only have {minutes_left} minutes to leave! Go now!")
+                        # Send an immediate text instead of scheduling one
+                        self.telegram_client.send_message(chat_id, f"🚨 URGENT: Leave in {minutes_left} minutes!")
+
+                    else:
+                        # Edge case: They are already late
+                        print("❌ You are already late for this departure time.")
+
+
                 # 6. Exit or Continue
                 again = input("\n🔄 Calculate another route? (y/n): ").strip().lower()
                 if again != 'y':
                     print("\n👋 Thank you for using Smart Commute Dashboard!")
+                    self.scheduler.shutdown(wait=False)
                     break
 
             except KeyboardInterrupt:
                 print("\n\n👋 Program terminated by user. Goodbye!")
+                self.scheduler.shutdown(wait=False)
                 break
             except Exception as e:
-                # In a cybersecurity context, you might use generic error messages
-                # to avoid information disclosure.
                 print(f"\n❌ An unexpected error occurred. Please try again.")
 
 
